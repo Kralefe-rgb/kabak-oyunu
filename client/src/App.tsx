@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { io } from 'socket.io-client';
 
 // NOT: Publish ederken buradaki localhost adresini Render linkinle değiştireceksin!
-const socket = io('http://localhost:3001');
+const socket = io('https://kabak-oyunu.onrender.com');
 
 function App() {
   const [name, setName] = useState('');
