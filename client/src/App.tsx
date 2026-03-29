@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { io } from 'socket.io-client';
 
-// NOT: Publish ederken buradaki localhost adresini Render linkinle değiştireceksin!
+// Burayı kendi Render linkinle değiştirmeyi unutma!
 const socket = io('https://kabak-oyunu.onrender.com');
 
 function App() {
@@ -36,7 +36,7 @@ function App() {
     });
     socket.on('receive_olmaz', (d) => { setMessage(`${d.s_name} (${d.s_num}): OLMAZ DEDİ!`); setStep(socket.id === turn.s_id ? 'kac_olsun_sor' : 'bekle'); setTimeLeft(100); });
     socket.on('receive_kac_olsun', (d) => { setMessage(`${d.s_name}: YA KAÇ KABAK OLUR?`); setStep(socket.id === turn.t_id ? 'hedef_sec' : 'bekle'); setTimeLeft(100); });
-    socket.on('timeout_recovery', (data) => { setMessage("BİRİ ELENDİ VEYA HATA YAPTI!"); setStep(socket.id === data.next_id ? 'hedef_sec' : 'bekle'); setTimeLeft(100); });
+    socket.on('timeout_recovery', (data) => { setMessage("SIRA DEVREDİLDİ!"); setStep(socket.id === data.next_id ? 'hedef_sec' : 'bekle'); setTimeLeft(100); });
     return () => { socket.off(); };
   }, [players, turn]);
 
@@ -72,68 +72,97 @@ function App() {
   }, [step === 'olmaz_de', myInfo?.num]);
 
   if (!joined) return (
-    <div style={{ backgroundColor: '#1a1a1a', height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
-      <h1 style={{color:'#4CAF50', fontSize:'3rem'}}>KABAK OYUNU</h1>
-      <input placeholder="Adın" onChange={(e) => setName(e.target.value)} style={{ padding: '15px', borderRadius: '10px', border:'none', fontSize:'1.2rem', textAlign:'center' }} />
-      <button onClick={() => { if(name) { socket.emit('join_game', { name }); setJoined(true); } }} style={{ marginTop: '20px', padding: '15px 50px', backgroundColor: '#4CAF50', color: 'white', borderRadius: '10px', fontWeight: 'bold', cursor:'pointer', border:'none' }}>BAŞLA</button>
+    <div style={{ backgroundColor: '#1a1a1a', height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white', padding: '20px' }}>
+      <h1 style={{color:'#4CAF50', fontSize:'2.5rem', textAlign:'center'}}>KABAK OYUNU</h1>
+      <input placeholder="Adın" onChange={(e) => setName(e.target.value)} style={{ padding: '15px', borderRadius: '10px', border:'none', fontSize:'1.2rem', width:'100%', maxWidth:'300px', textAlign:'center' }} />
+      <button onClick={() => { if(name) { socket.emit('join_game', { name }); setJoined(true); } }} style={{ marginTop: '20px', padding: '15px 50px', backgroundColor: '#4CAF50', color: 'white', borderRadius: '10px', fontWeight: 'bold', cursor:'pointer', border:'none', width:'100%', maxWidth:'300px' }}>BAŞLA</button>
     </div>
   );
 
   return (
-    <div style={{ backgroundColor: '#121212', color: 'white', height: '100vh', display: 'flex', flexDirection: 'column', fontFamily: 'sans-serif' }}>
-      <div style={{ padding: '15px 25px', backgroundColor: '#1f1f1f', display: 'flex', justifyContent: 'space-between', borderBottom:'1px solid #333', alignItems:'center' }}>
-        <div>💰 Puan: <span style={{color:'#FFD700'}}>{myInfo?.points}</span></div>
+    <div style={{ backgroundColor: '#121212', color: 'white', minHeight: '100vh', display: 'flex', flexDirection: 'column', fontFamily: 'sans-serif' }}>
+      {/* ÜST PANEL */}
+      <div style={{ padding: '10px 15px', backgroundColor: '#1f1f1f', display: 'flex', justifyContent: 'space-between', borderBottom:'1px solid #333', alignItems:'center', fontSize: '0.9rem' }}>
+        <div>💰 <span style={{color:'#FFD700'}}>{myInfo?.points}p</span></div>
         {myInfo?.num === 1 && gameStarted && (
-          <button onClick={() => socket.emit('reset_game_request')} style={{ backgroundColor: '#e74c3c', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>🔄 OYUNU SIFIRLA</button>
+          <button onClick={() => socket.emit('reset_game_request')} style={{ backgroundColor: '#e74c3c', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '5px', fontSize:'0.7rem' }}>Sıfırla</button>
         )}
-        <div>Senin No: <span style={{color:'#4CAF50'}}>{myInfo?.num}</span></div>
+        <div>No: <span style={{color:'#4CAF50'}}>{myInfo?.num}</span></div>
       </div>
-      <div style={{ height: '8px', backgroundColor: '#333' }}>
+
+      {/* SÜRE ÇUBUĞU */}
+      <div style={{ height: '6px', backgroundColor: '#333' }}>
         <div style={{ height: '100%', backgroundColor: timeLeft > 30 ? '#4CAF50' : '#e74c3c', width: `${timeLeft}%`, transition: 'width 0.1s linear' }}></div>
       </div>
       
-      <div style={{ flex: 1, display: 'flex', padding: '20px', gap: '20px', overflow:'hidden' }}>
-        <div style={{ width: '250px', backgroundColor: '#1a1a1a', borderRadius: '15px', padding: '15px', border: '1px solid #333' }}>
-          <h4 style={{ color: '#888', textAlign: 'center', margin: '0 0 10px 0' }}>OYUNCULAR</h4>
-          {players.map(p => {
-            const isPlayerWinner = alivePlayers.length === 1 && p.id === alivePlayers[0].id && gameStarted;
-            return (
-              <div key={p.id} style={{ padding: '10px', marginBottom: '8px', borderRadius: '8px', backgroundColor: p.isAlive ? '#2c3e50' : '#000', border: p.id === myInfo?.id ? '2px solid #4CAF50' : 'none', opacity: p.isAlive ? 1 : 0.4 }}>
-                <strong>{p.name} ({p.num})</strong> {isPlayerWinner && <span style={{backgroundColor:'#FFD700', color:'black', padding:'2px 5px', borderRadius:'4px', fontSize:'0.7rem', fontWeight:'bold', marginLeft:'5px'}}>KAZANDI</span>} <br/> {p.points}p {!p.isAlive && "💀 ELENDİ"}
-              </div>
-            );
-          })}
+      {/* ANA İÇERİK (Dikey Dizilim) */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '10px', gap: '15px' }}>
+        
+        {/* OYUNCU LİSTESİ (Yatay Kaydırılabilir) */}
+        <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '10px', borderBottom: '1px solid #222' }}>
+          {players.map(p => (
+            <div key={p.id} style={{ 
+              minWidth: '90px', padding: '8px', borderRadius: '10px', 
+              backgroundColor: p.isAlive ? (p.id === myInfo?.id ? '#1e3a2a' : '#2c3e50') : '#000', 
+              border: p.id === myInfo?.id ? '1px solid #4CAF50' : 'none',
+              opacity: p.isAlive ? 1 : 0.4, textAlign: 'center', fontSize: '0.75rem'
+            }}>
+              <div style={{fontWeight:'bold', overflow:'hidden', textOverflow:'ellipsis'}}>{p.name} ({p.num})</div>
+              <div>{p.points}p</div>
+              {alivePlayers.length === 1 && p.id === alivePlayers[0].id && gameStarted && <div style={{color:'#FFD700', fontSize:'0.6rem'}}>🏆</div>}
+            </div>
+          ))}
         </div>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-          {isWinner ? ( <h1 style={{fontSize:'5rem', color:'#FFD700'}}>🏆 ŞAMPİYONSUN!</h1> ) : myInfo?.isAlive ? (
-            <div style={{maxWidth: '80%'}}>
-              <h1 style={{ fontSize: '2.8rem', color: '#4CAF50', marginBottom: '40px', lineHeight:'1.3' }}>{message}</h1>
-              <div style={{ minHeight: '150px', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                {!gameStarted ? ( players[0]?.id === socket.id && <button onClick={() => socket.emit('start_game_request')} style={{ padding: '20px 60px', backgroundColor: '#FFD700', borderRadius: '50px', fontWeight: 'bold', border:'none', cursor:'pointer' }}>🚀 OYUNU BAŞLAT</button> ) : (
-                  <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                    {step === 'bekle' && <p style={{ color: '#888', fontSize:'1.2rem' }}>Sıra bekleniyor...</p>}
+
+        {/* MESAJ VE BUTONLAR */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '10px' }}>
+          {isWinner ? (
+            <h1 style={{fontSize:'3rem', color:'#FFD700'}}>🏆 ŞAMPİYON!</h1>
+          ) : myInfo?.isAlive ? (
+            <div style={{width: '100%'}}>
+              <h2 style={{ fontSize: '1.4rem', color: '#4CAF50', marginBottom: '30px', minHeight: '3.5rem' }}>{message}</h2>
+              
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap', width: '100%' }}>
+                {!gameStarted ? (
+                  players[0]?.id === socket.id && <button onClick={() => socket.emit('start_game_request')} style={{ padding: '15px 40px', backgroundColor: '#FFD700', borderRadius: '50px', fontWeight: 'bold', color:'black' }}>OYUNU BAŞLAT</button>
+                ) : (
+                  <>
+                    {step === 'bekle' && <p style={{ color: '#888' }}>Diğerleri oynuyor...</p>}
+                    
                     {step === 'olmaz_de' && fixedButtons.map((btn, i) => (
-                      <button key={i} onClick={() => { if(btn.isFake) { socket.emit('wrong_action', { back_to_id: turn.s_id }); setStep('bekle'); } else { handleAction('olmaz_de'); } }} style={btnStyle}>{btn.label}</button>
+                      <button key={i} onClick={() => { if(btn.isFake) { socket.emit('wrong_action', { back_to_id: turn.s_id }); setStep('bekle'); } else { handleAction('olmaz_de'); } }} style={mobileBtn}>{btn.label}</button>
                     ))}
-                    {step === 'kac_olsun_sor' && <button onClick={() => handleAction('kac_olsun_sor')} style={btnStyle}>YA KAÇ KABAK OLUR?</button>}
-                    {step === 'hedef_sec' && alivePlayers.filter(p=>p.num !== myInfo?.num).map(p => ( <button key={p.id} onClick={() => handleAction('hedef_sec', p.num)} style={choiceBtn}>{p.num} KABAK OLUR</button> ))}
-                  </div>
+
+                    {step === 'kac_olsun_sor' && <button onClick={() => handleAction('kac_olsun_sor')} style={mobileBtn}>YA KAÇ KABAK OLUR?</button>}
+                    
+                    {step === 'hedef_sec' && alivePlayers.filter(p=>p.num !== myInfo?.num).map(p => (
+                      <button key={p.id} onClick={() => handleAction('hedef_sec', p.num)} style={mobileChoiceBtn}>{p.num} KABAK OLUR</button>
+                    ))}
+                  </>
                 )}
               </div>
             </div>
-          ) : <h1 style={{color: '#e74c3c', fontSize:'4rem'}}>💀 PATLADIN! <br/><span style={{fontSize:'1rem', color:'#555'}}>Created by ED</span></h1>}
+          ) : <h1 style={{color: '#e74c3c'}}>💀 ELENDİN!</h1>}
         </div>
       </div>
 
-      {/* FOOTER: Created by ED Kısmı */}
-      <div style={{ padding: '10px', textAlign: 'center', backgroundColor: '#1a1a1a', color: '#444', fontSize: '0.75rem', borderTop: '1px solid #333' }}>
-        © 2026 KABAK OYUNU | Created by <span style={{ color: '#FFD700', fontWeight: 'bold' }}>ED</span>. Tüm Hakları Saklıdır.
+      {/* FOOTER */}
+      <div style={{ padding: '8px', textAlign: 'center', backgroundColor: '#1a1a1a', color: '#444', fontSize: '0.65rem' }}>
+        © 2026 | Created by <span style={{ color: '#FFD700' }}>ED</span>
       </div>
     </div>
   );
 }
 
-const btnStyle = { padding: '20px 30px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '15px', fontWeight: 'bold', fontSize: '1.2rem', cursor: 'pointer', boxShadow: '0 5px 0 #2E7D32' };
-const choiceBtn = { padding: '15px 25px', backgroundColor: '#2c3e50', color: 'white', border: '1px solid #444', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' };
+const mobileBtn = { 
+  width: '85%', padding: '16px', backgroundColor: '#4CAF50', color: 'white', 
+  border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '1rem', 
+  boxShadow: '0 4px 0 #2E7D32', active: { transform: 'translateY(2px)', boxShadow: 'none' } 
+};
+
+const mobileChoiceBtn = { 
+  width: '45%', padding: '12px', backgroundColor: '#2c3e50', color: 'white', 
+  border: '1px solid #444', borderRadius: '10px', fontWeight: 'bold', fontSize: '0.9rem' 
+};
 
 export default App;
