@@ -10,22 +10,32 @@ const io = new Server(server, { cors: { origin: "*" } });
 
 let players = [];
 
+// Numaraları her değişiklikte 1'den başlayarak yeniden dağıtan fonksiyon
+const reassignNumbers = () => {
+    players.forEach((p, index) => {
+        p.num = index + 1;
+    });
+};
+
 io.on('connection', (socket) => {
     socket.on('join_game', (data) => {
-        const playerNum = players.length + 1;
-        // Başlangıç puanı 200 olarak güncellendi
-        players.push({ id: socket.id, name: data.name, num: playerNum, points: 200, isAlive: true });
+        // Yeni oyuncuyu ekle (Geçici numara veriyoruz, reassign düzeltecek)
+        players.push({ 
+            id: socket.id, 
+            name: data.name, 
+            num: 0, 
+            points: 200, 
+            isAlive: true 
+        });
+        reassignNumbers(); // Numaraları tazele
         io.emit('update_players', players);
     });
 
     socket.on('start_game_request', () => io.emit('game_start_signal'));
 
-    // HOST RESET: Sadece 1 numaralı oyuncu tetikleyebilir
     socket.on('reset_game_request', () => {
-        players.forEach(p => { 
-            p.points = 200; 
-            p.isAlive = true; 
-        });
+        players.forEach(p => { p.points = 200; p.isAlive = true; });
+        reassignNumbers(); // Reset atınca da numaralar netleşsin
         io.emit('update_players', players);
         io.emit('game_reset_signal');
     });
@@ -34,10 +44,7 @@ io.on('connection', (socket) => {
         const s = players.find(p => p.id === socket.id);
         const t = players.find(p => p.num === parseInt(data.targetNum));
         if (s && t && t.isAlive) {
-            io.emit('receive_olur', { 
-                s_id: s.id, s_name: s.name, s_num: s.num, 
-                t_id: t.id, t_num: t.num 
-            });
+            io.emit('receive_olur', { s_id: s.id, s_name: s.name, s_num: s.num, t_id: t.id, t_num: t.num });
         }
     });
 
@@ -57,8 +64,6 @@ io.on('connection', (socket) => {
             p.points -= 25;
             if (p.points <= 0) { p.points = 0; p.isAlive = false; }
             io.emit('update_players', players);
-            
-            // Sırayı kurtarma: Pası atan hayattaysa ona, değilse yaşayan ilk kişiye
             const backTo = players.find(pl => pl.id === data.back_to_id && pl.isAlive);
             const nextId = backTo ? backTo.id : players.find(pl => pl.isAlive)?.id;
             io.emit('timeout_recovery', { next_id: nextId });
@@ -67,6 +72,7 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         players = players.filter(p => p.id !== socket.id);
+        reassignNumbers(); // BİRİ ÇIKTIĞINDA NUMARALARI YENİDEN DAĞIT 🚀
         io.emit('update_players', players);
     });
 });
